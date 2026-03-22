@@ -1,0 +1,53 @@
+name: Sync Upstream
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 */6 * * *"
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-upstream-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout fork
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Add upstream and fetch
+        run: |
+          git remote add upstream https://github.com/mtvpls/MoonTVPlus.git || true
+          git remote set-url upstream https://github.com/mtvpls/MoonTVPlus.git
+          git fetch --prune origin
+          git fetch --prune upstream
+
+      - name: Detect target branch
+        id: vars
+        run: |
+          BRANCH="${{ github.event.repository.default_branch || github.ref_name || 'main' }}"
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+
+      - name: Sync from upstream
+        run: |
+          git checkout "${{ steps.vars.outputs.branch }}"
+          git merge --no-edit "upstream/${{ steps.vars.outputs.branch }}"
+
+      - name: Push to fork
+        run: |
+          git push origin "${{ steps.vars.outputs.branch }}"
