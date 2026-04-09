@@ -1045,95 +1045,109 @@ const DetailPanel: React.FC<DetailPanelProps> = ({
     return { visibleItems, totalHeight, usedWidth };
   }, [galleryImages, galleryScrollTop, galleryViewportHeight, galleryViewportWidth]);
 
-  const galleryModal = showGallery ? (
+  const galleryBody = (
+    <div ref={galleryScrollRef} className="flex-1 overflow-y-auto overflow-x-hidden p-4">
+      {galleryLoading && (
+        <div className="flex items-center justify-center py-20">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-green-500"></div>
+        </div>
+      )}
+
+      {!galleryLoading && galleryError && (
+        <div className="text-center py-12 text-red-500 dark:text-red-400">{galleryError}</div>
+      )}
+
+      {!galleryLoading && !galleryError && galleryImages.length === 0 && (
+        <div className="text-center py-12 text-gray-500 dark:text-gray-400">暂无图片</div>
+      )}
+
+      {!galleryLoading && !galleryError && galleryImages.length > 0 && (
+        <div
+          className="relative mx-auto"
+          style={{ height: virtualGalleryLayout.totalHeight, width: virtualGalleryLayout.usedWidth || '100%' }}
+        >
+          {virtualGalleryLayout.visibleItems.map((image) => {
+            const imageUrl = getTMDBImageUrl(
+              image.file_path,
+              image.imageType === 'poster' ? 'w500' : 'original'
+            );
+            const thumbUrl = getTMDBImageUrl(
+              image.file_path,
+              image.imageType === 'poster' ? 'w342' : 'w780'
+            );
+
+            return (
+              <div
+                key={`${image.imageType}-${image.file_path}-${image.index}`}
+                className="group absolute"
+                style={{
+                  top: image.top,
+                  left: image.left,
+                  width: image.renderWidth,
+                  height: image.renderHeight,
+                }}
+              >
+                <div
+                  className="relative w-full h-full overflow-hidden rounded-md bg-gray-100 dark:bg-gray-800 cursor-pointer hover:opacity-90 transition-opacity"
+                  onClick={() => handleImageClick(imageUrl)}
+                >
+                  <ProxyImage
+                    originalSrc={thumbUrl}
+                    alt={`${detailData?.title || title}-gallery-${image.index + 1}`}
+                    className="absolute inset-0 w-full h-full object-cover"
+                    draggable={false}
+                  />
+                  <div className="absolute left-2 top-2 px-2 py-0.5 rounded-full text-xs bg-black/60 text-white">
+                    {image.imageType === 'poster' ? '海报' : '剧照'}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+
+  const galleryHeader = (
+    <div className="flex items-center justify-between p-4 border-b border-gray-100 dark:border-gray-800">
+      <div>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">照片墙</h3>
+        {!galleryLoading && (
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            共 {galleryTotal} 张
+          </p>
+        )}
+      </div>
+      <button
+        onClick={() => setShowGallery(false)}
+        className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+        aria-label="关闭照片墙"
+      >
+        <X size={20} className="text-gray-500 dark:text-gray-400" />
+      </button>
+    </div>
+  );
+
+  const galleryModal = showGallery ? (useDrawer ? (
+    <div className="fixed inset-0 z-[10000] flex items-center justify-end pointer-events-none">
+      <div className={`relative ${drawerWidth} h-full bg-white dark:bg-gray-900 shadow-2xl overflow-hidden flex flex-col pointer-events-auto`}>
+        {galleryHeader}
+        {galleryBody}
+      </div>
+    </div>
+  ) : (
     <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4">
       <div
         className="absolute inset-0 bg-black/60"
         onClick={() => setShowGallery(false)}
       />
       <div className="relative w-full max-w-6xl max-h-[90vh] bg-white dark:bg-gray-900 rounded-2xl shadow-2xl overflow-hidden flex flex-col">
-        <div className="flex items-center justify-between p-4 border-b border-gray-100 dark:border-gray-800">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">照片墙</h3>
-            {!galleryLoading && (
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                共 {galleryTotal} 张
-              </p>
-            )}
-          </div>
-          <button
-            onClick={() => setShowGallery(false)}
-            className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-            aria-label="关闭照片墙"
-          >
-            <X size={20} className="text-gray-500 dark:text-gray-400" />
-          </button>
-        </div>
-
-        <div ref={galleryScrollRef} className="flex-1 overflow-y-auto overflow-x-hidden p-4">
-          {galleryLoading && (
-            <div className="flex items-center justify-center py-20">
-              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-green-500"></div>
-            </div>
-          )}
-
-          {!galleryLoading && galleryError && (
-            <div className="text-center py-12 text-red-500 dark:text-red-400">{galleryError}</div>
-          )}
-
-          {!galleryLoading && !galleryError && galleryImages.length === 0 && (
-            <div className="text-center py-12 text-gray-500 dark:text-gray-400">暂无图片</div>
-          )}
-
-          {!galleryLoading && !galleryError && galleryImages.length > 0 && (
-            <div
-              className="relative mx-auto"
-              style={{ height: virtualGalleryLayout.totalHeight, width: virtualGalleryLayout.usedWidth || '100%' }}
-            >
-              {virtualGalleryLayout.visibleItems.map((image) => {
-                const imageUrl = getTMDBImageUrl(
-                  image.file_path,
-                  image.imageType === 'poster' ? 'w500' : 'original'
-                );
-                const thumbUrl = getTMDBImageUrl(
-                  image.file_path,
-                  image.imageType === 'poster' ? 'w342' : 'w780'
-                );
-
-                return (
-                  <div
-                    key={`${image.imageType}-${image.file_path}-${image.index}`}
-                    className="group absolute"
-                    style={{
-                      top: image.top,
-                      left: image.left,
-                      width: image.renderWidth,
-                      height: image.renderHeight,
-                    }}
-                  >
-                    <div
-                      className="relative w-full h-full overflow-hidden rounded-md bg-gray-100 dark:bg-gray-800 cursor-pointer hover:opacity-90 transition-opacity"
-                      onClick={() => handleImageClick(imageUrl)}
-                    >
-                      <ProxyImage
-                        originalSrc={thumbUrl}
-                        alt={`${detailData?.title || title}-gallery-${image.index + 1}`}
-                        className="absolute inset-0 w-full h-full object-cover"
-                        draggable={false}
-                      />
-                      <div className="absolute left-2 top-2 px-2 py-0.5 rounded-full text-xs bg-black/60 text-white">
-                        {image.imageType === 'poster' ? '海报' : '剧照'}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
+        {galleryHeader}
+        {galleryBody}
       </div>
     </div>
-  ) : null;
+  )) : null;
 
   if (!isVisible || !mounted) return null;
 
