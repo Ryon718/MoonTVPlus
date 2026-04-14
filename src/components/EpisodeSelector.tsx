@@ -12,6 +12,7 @@ import React, {
 
 import type { DanmakuComment,DanmakuSelection } from '@/lib/danmaku/types';
 import { generateStorageKey, getCachedPlayRecordsSnapshot } from '@/lib/db.client';
+import { loadLocalEpisodeProgressRecord } from '@/lib/episode-progress';
 import { EpisodeFilterConfig,SearchResult } from '@/lib/types';
 import { getVideoResolutionFromM3u8 } from '@/lib/utils';
 
@@ -146,13 +147,12 @@ const EpisodeSelector: React.FC<EpisodeSelectorProps> = ({
 
       for (let episodeNumber = 1; episodeNumber <= totalEpisodes; episodeNumber++) {
         try {
-          const raw = localStorage.getItem(
-            `moontv_episode_progress:${currentSource}+${currentId}:${episodeNumber - 1}`
+          const record = loadLocalEpisodeProgressRecord(
+            currentSource,
+            currentId,
+            episodeNumber - 1
           );
-          if (!raw) continue;
-
-          const parsed = JSON.parse(raw) as { playTime?: number };
-          if (Number(parsed.playTime) > 1) {
+          if (Number(record?.playTime) > 1) {
             watched.add(episodeNumber);
           }
         } catch (error) {

@@ -45,6 +45,11 @@ import {
   saveSkipConfig,
   subscribeToDataUpdates,
 } from '@/lib/db.client';
+import {
+  loadLocalEpisodeProgress,
+  pruneLocalEpisodeProgressStorage,
+  saveLocalEpisodeProgress,
+} from '@/lib/episode-progress';
 import { getDoubanDetail } from '@/lib/douban.client';
 import { getTMDBImageUrl } from '@/lib/tmdb.search';
 import { DanmakuFilterConfig, EpisodeFilterConfig, SearchResult } from '@/lib/types';
@@ -748,10 +753,11 @@ function PlayPageClient() {
       return;
     }
 
-    // 检查是否禁用了自动装填弹幕
-    const disableAutoLoad = localStorage.getItem('disableAutoLoadDanmaku') === 'true';
-    if (disableAutoLoad) {
-      console.log('[弹幕] 已禁用自动装填弹幕，跳过自动加载');
+    // 检查是否禁用了自动加载弹幕
+    if (isDanmakuAutoLoadDisabled()) {
+      console.log('[弹幕] 已禁用自动加载弹幕，跳过自动加载');
+      setShowDanmakuSourceSelector(false);
+      setDanmakuLoading(false);
       return;
     }
 
@@ -1564,63 +1570,6 @@ function PlayPageClient() {
     return (window as any).RUNTIME_CONFIG?.DANMAKU_AUTO_LOAD_DEFAULT === false;
   };
 
-  const getEpisodeProgressStorageKey = (
-    source: string,
-    id: string,
-    episodeIndex: number
-  ) => `moontv_episode_progress:${source}+${id}:${episodeIndex}`;
-
-  const loadLocalEpisodeProgress = (
-    source: string,
-    id: string,
-    episodeIndex: number
-  ): number | null => {
-    if (typeof window === 'undefined') {
-      return null;
-    }
-
-    try {
-      const raw = localStorage.getItem(
-        getEpisodeProgressStorageKey(source, id, episodeIndex)
-      );
-      if (!raw) {
-        return null;
-      }
-
-      const parsed = JSON.parse(raw) as { playTime?: number };
-      const playTime = Number(parsed.playTime);
-      return Number.isFinite(playTime) && playTime > 1 ? playTime : null;
-    } catch (error) {
-      console.warn('[Play] Failed to load local episode progress:', error);
-      return null;
-    }
-  };
-
-  const saveLocalEpisodeProgress = (
-    source: string,
-    id: string,
-    episodeIndex: number,
-    playTime: number,
-    totalTime: number
-  ) => {
-    if (typeof window === 'undefined' || !Number.isFinite(playTime) || playTime <= 0) {
-      return;
-    }
-
-    try {
-      localStorage.setItem(
-        getEpisodeProgressStorageKey(source, id, episodeIndex),
-        JSON.stringify({
-          playTime: Math.floor(playTime),
-          totalTime: Math.floor(totalTime),
-          updatedAt: Date.now(),
-        })
-      );
-    } catch (error) {
-      console.warn('[Play] Failed to save local episode progress:', error);
-    }
-  };
-
   // 用于记录是否需要在播放器 ready 后跳转到指定进度
   const resumeTimeRef = useRef<number | null>(null);
   // 播放记录跳转按钮状态
@@ -1641,6 +1590,14 @@ function PlayPageClient() {
     null
   );
   const [backgroundSourcesLoading, setBackgroundSourcesLoading] = useState(false);
+
+  useEffect(() => {
+    try {
+      pruneLocalEpisodeProgressStorage();
+    } catch (error) {
+      console.warn('[Play] Failed to prune local episode progress:', error);
+    }
+  }, []);
 
   // 优选和测速开关
   const [optimizationEnabled] = useState<boolean>(() => {
@@ -4779,8 +4736,7 @@ function PlayPageClient() {
   const preloadNextEpisodeDanmaku = async () => {
     try {
       if (isDirectPlay) return;
-      const disableAutoLoad = localStorage.getItem('disableAutoLoadDanmaku') === 'true';
-      if (disableAutoLoad) return;
+      if (isDanmakuAutoLoadDisabled()) return;
 
       const title = videoTitleRef.current;
       if (!title) {
